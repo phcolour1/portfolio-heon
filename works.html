@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>LEE JONGHEON</title>
+        <link rel="stylesheet" href="./style.css">
+        <link rel="stylesheet" href="./works.css">
+</head>
+<body>
+    <nav class="nav">
+        <div class="navMain">
+            <a href="./index.html">HOME</a>
+            <a href="./works.html">WORK</a>
+            <a href="./contact.html">CONTACT</a>
+        </div>
+    </nav>
+    <header>
+        <div class="header-container">
+            <a href="./index.html" class="header-l">
+                <span>HEON</span>
+            </a>
+            <input type="checkbox" name="" id="navCheckbox" class="dpnone">
+            <div class="header-r">
+                <label for="navCheckbox" id="navToggle" >
+                    +
+                </label>    
+            </div>
+        </div>
+    </header>
+    <main>
+        <div class="worksNavBar">
+            <div class="worksNavBar-l">
+                <input type="checkbox" name="filterCheckbox" id="filterCheckbox">
+                <div class="item-filter">
+                    <label class="item-filter-top" for="filterCheckbox">
+                        <span class="item-filter-top-text">ALL</span>
+                        <div class="item-filter-arrow">></div>
+                    </label>
+                    <ol class="item-filter-option-container">
+                    </ol>
+                </div>
+            </div>
+            <div class="worksNavBar-r">
+                <span>results</span>
+            </div>
+        </div>
+        <ol class="item-container">
+        </ol>
+    </main>
+
+    <!-- 로딩 스피너 -->
+    <div id="loadingSpinner" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: #0e0e0e;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    ">
+        <div style="
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        "></div>
+    </div>
+
+    <style>
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+
+<script>
+    // ========== 설정 ==========
+    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxPncRFevyI6TrJsXDg15izhSs8SmJd8BCzgAKAtm5HgyIwfrGtSYOIcwZabogha5gYzA/exec';
+    
+    const itemContainer = document.querySelector('.item-container');
+    const optionContainer = document.querySelector('.item-filter-option-container');
+    const itemFilterTopText = document.querySelector('.item-filter-top-text');
+    const filterCheckbox = document.querySelector('#filterCheckbox');
+    const resultsSpan = document.querySelector('.worksNavBar-r span');
+    
+    let allPosts = []; // 전체 게시물 저장
+
+    // ========== 구글 시트에서 데이터 로드 ==========
+    async function loadPostsFromSheet() {
+        try {
+            const response = await fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'getPosts'
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                allPosts = result.posts;
+                initializeFilter();
+                renderItems(allPosts);
+            } else {
+                throw new Error(result.message || 'Failed to load posts');
+            }
+        } catch (error) {
+            console.error('Load error:', error);
+            alert('Failed to load posts. Please try again later.');
+        } finally {
+            // 로딩 스피너 제거
+            const spinner = document.getElementById('loadingSpinner');
+            if (spinner) spinner.remove();
+        }
+    }
+
+    // ========== 필터 초기화 ==========
+    function initializeFilter() {
+        // 고유한 카테고리 추출
+        const categories = [...new Set(allPosts.map(post => post.category).filter(cat => cat))];
+
+        // 필터 옵션 생성
+        optionContainer.innerHTML = `
+            <li class="item-filter-option active">
+                <span class="item-filter-checksvg">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 11" stroke-width="1.5">
+                        <path d="M 2.5 5.5 L 3.5 6.5 L 4.5 7.5 L 8.5 3.5" fill="transparent" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </span>
+                ALL
+            </li>` + categories.map(category => `
+            <li class="item-filter-option">${category}</li>
+        `).join('');
+
+        // 필터 옵션 클릭 이벤트
+        optionContainer.addEventListener('click', event => {
+            if (event.target.classList.contains('item-filter-option')) {
+                const selectedCategory = event.target.textContent.trim();
+                itemFilterTopText.textContent = selectedCategory;
+
+                // 모든 SVG 제거
+                document.querySelectorAll('.item-filter-option svg').forEach(svg => svg.remove());
+
+                // 선택된 옵션에 SVG 추가
+                event.target.innerHTML = `
+                    <span class="item-filter-checksvg">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 11" stroke-width="1.5">
+                            <path d="M 2.5 5.5 L 3.5 6.5 L 4.5 7.5 L 8.5 3.5" fill="transparent" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                    </span>
+                    ${selectedCategory}`;
+
+                // 필터링
+                const filteredPosts = selectedCategory === 'ALL'
+                    ? allPosts
+                    : allPosts.filter(post => post.category === selectedCategory);
+
+                renderItems(filteredPosts);
+                filterCheckbox.checked = false;
+            }
+        });
+    }
+
+    // ========== 구글 드라이브 URL을 썸네일 URL로 변환 ==========
+    function convertToThumbnailUrl(url) {
+        if (!url) return 'https://via.placeholder.com/640x480?text=No+Image';
+        
+        // Google Drive URL에서 파일 ID 추출
+        const patterns = [
+            /[?&]id=([a-zA-Z0-9_-]+)/,     // id=FILE_ID 형식 (먼저 체크)
+            /\/d\/([a-zA-Z0-9_-]+)/,        // /d/FILE_ID 형식
+            /\/file\/d\/([a-zA-Z0-9_-]+)/   // /file/d/FILE_ID 형식
+        ];
+        
+        for (let pattern of patterns) {
+            const match = url.match(pattern);
+            if (match && match[1]) {
+                const fileId = match[1];
+                // 썸네일 API 사용 (더 안정적)
+                return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+            }
+        }
+        
+        // 패턴 매칭 실패 시 원본 URL 반환
+        return url;
+    }
+
+    // ========== 아이템 렌더링 ==========
+    function renderItems(posts) {
+        if (posts.length === 0) {
+            itemContainer.innerHTML = '';
+            resultsSpan.textContent = '0 results';
+            return;
+        }
+
+        const itemsHTML = posts.map(post => {
+            const thumbnailUrl = convertToThumbnailUrl(post.thumbnail);
+            return `
+            <a href="post.html?id=${post.id}" class="witem">
+                <div class="witem-thumb">
+                    <img src="${thumbnailUrl}" 
+                         alt="${post.title}" 
+                         class="witem-img"
+                         onerror="this.src='https://via.placeholder.com/640x480?text=No+Image'; this.onerror=null;">
+                </div>
+                <div class="witem-info">
+                    <span class="witem-categories">${post.category || 'Uncategorized'}</span>
+                    <div class="witem-title">${post.title}</div>
+                </div>
+            </a>
+        `;
+        }).join('');
+
+        itemContainer.innerHTML = itemsHTML;
+        resultsSpan.textContent = `${posts.length} results`;
+    }
+
+    // ========== 초기 로드 ==========
+    loadPostsFromSheet();
+</script>
+
+<script src="./navToggle.js"></script>
+<script src="./auth.js"></script>
+</body>
+</html>
